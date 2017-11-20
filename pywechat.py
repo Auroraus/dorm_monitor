@@ -9,24 +9,33 @@ import itchat
 import win32com.client 
 import cv2,os
 import win32api,time
-import numpy as np
+from arduino import Arduino 
+from PIL import ImageGrab
 
 
 voice= win32com.client.Dispatch("SAPI.SpVoice")
 itchat.login()
+try:
+    b = Arduino('COM8')
+    pin = 13
 
-itchat.send('python——微信宿舍监控系统\n1.输入cap:发送宿舍实时图像信息。\n2.输入video:发送宿\
-舍实时视频监控信息\n3.发送@+文件（或者程序），远程打开文件\n4.发送\
-除上述情况外的文本，远程实时文本转语音输出',toUserName='filehelper')
+    b.output([pin]) 
+except:
+    pass
+
+itchat.send('python——微信宿舍监控系统\n1.输入照片:发送宿舍实时图像信息。\n2.输入视频:发送宿\
+舍实时视频监控信息\n3.发送#+文件（或者程序），远程打开文件\n4.输入开灯，则arduino上的13号led\
+灯点亮\n5.输入关灯，则arduino上的13号led灯熄灭\
+\n6.发送除上述情况以外的文本，远程实时文本转语音输出',toUserName='filehelper')
 
 @itchat.msg_register('Text') #注册文本消息
-def text_reply(msg): #心跳程序
+def text_reply(msg):
     global flag
-    message =  msg['Text'] #接收文本消息
-    toName = msg['ToUserName'] #接收方
-
+    message =  msg['Text'] 
+    toName = msg['ToUserName'] 
+    insert=['照片','视频','开灯','关灯','#']
     if toName == "filehelper":
-        if message == "cap": #远程拍照并发送到手机
+        if message == "照片": #远程拍照并发送到手机
         
             cap = cv2.VideoCapture(0)
             fourcc = cv2.VideoWriter_fourcc(*'XVID')
@@ -65,17 +74,24 @@ def text_reply(msg): #心跳程序
             im2 = im1.rotate(180)
             im2.save('image.jpg')
             itchat.send('@img@%s'%u'image.jpg',toUserName='filehelper')
-        if "@" not in message[0] or message !='cap' or message !='video' :
+        if not((message in insert) or  message[0]=='#'):
             voice.Speak(message)
-        if message[0]=='@':
+            itchat.send('[文本已成功转为语音读出]',toUserName='filehelper')
+        if message[0]=='#':
             if os.path.exists(message[1:]):
                 try:
                     win32api.ShellExecute(0,'open', message[1:], '','',1)
+                    time.sleep(3)
+                    im = ImageGrab.grab()
+                    im.save('cut.jpg')
+                    itchat.send(message[1:]+'已经成功打开',toUserName='filehelper')
+                    itchat.send('屏幕截图如下所示',toUserName='filehelper')
+                    itchat.send('@img@%s'%u'cut.jpg',toUserName='filehelper')
                 except:
                     pass
             else:
                 itchat.send('打开文件失败',toUserName='filehelper')
-        if message == "video":
+        if message == "视频":
           try:
             cap = cv2.VideoCapture(0)
             fourcc = cv2.VideoWriter_fourcc(*'XVID')
@@ -94,5 +110,19 @@ def text_reply(msg): #心跳程序
             itchat.send('@vid@%s'%u'output.mp4',toUserName='filehelper') 
           except:
               itchat.send('获取视频失败',toUserName='filehelper') 
+        if message == "开灯":
+            try:
+                b.setHigh(pin)
+                itchat.send('开灯成功！(:',toUserName='filehelper')
+            except:
+                itchat.send('开灯失败):',toUserName='filehelper') 
+        if message == "关灯":
+            try:
+                b.setLow(pin)
+                itchat.send('关灯成功 ):',toUserName='filehelper')
+            except:
+                itchat.send('关灯失败 ):',toUserName='filehelper') 
 itchat.run()
+
+
 
